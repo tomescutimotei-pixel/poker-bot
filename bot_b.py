@@ -158,7 +158,7 @@ async def deposit_flow(call: types.CallbackQuery):
 
     await call.message.answer(
         f"💰 *Depunere KingsRiver Poker Club*\n\n"
-        f"Trimite *USDT (TON)* la adresa de mai jos din *Telegram Wallet*:\n\n"
+        f"Trimite *USDT (TON)* la adresa de mai jos din [Telegram Wallet](https://t.me/wallet):\n\n"
         f"`{CLUB_WALLET}`\n\n"
         f"⚠️ *OBLIGATORIU* — pune acest cod în câmpul *Comentariu / Memo*:\n\n"
         f"*`{code}`*\n\n"
