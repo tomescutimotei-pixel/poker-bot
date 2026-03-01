@@ -2,7 +2,6 @@ import asyncio
 import os
 from functools import wraps
 from flask import Flask, render_template_string, jsonify, request, session, redirect, url_for
-import asyncpg
 import database
 
 app = Flask(__name__)
@@ -10,6 +9,16 @@ app.secret_key = os.getenv("DASHBOARD_SECRET_KEY", "change_this_in_production")
 
 ADMIN_USERNAME = os.getenv("DASHBOARD_USER", "admin")
 ADMIN_PASSWORD = os.getenv("DASHBOARD_PASS", "kingsriver2024")
+
+# ─── EVENT LOOP PERSISTENT ────────────────────────────
+_loop = asyncio.new_event_loop()
+asyncio.set_event_loop(_loop)
+
+def run_async(coro):
+    return _loop.run_until_complete(coro)
+
+# ─── INIT DB LA PORNIRE ───────────────────────────────
+run_async(database.init_db())
 
 # ─── AUTH ─────────────────────────────────────────────
 def login_required(f):
@@ -19,14 +28,6 @@ def login_required(f):
             return redirect(url_for("login"))
         return f(*args, **kwargs)
     return decorated
-
-def run_async(coro):
-    loop = asyncio.new_event_loop()
-    asyncio.set_event_loop(loop)
-    try:
-        return loop.run_until_complete(coro)
-    finally:
-        loop.close()
 
 # ─── LOGIN ────────────────────────────────────────────
 @app.route("/login", methods=["GET", "POST"])
