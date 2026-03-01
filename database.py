@@ -44,6 +44,14 @@ async def init_db():
                 value TEXT
             )
         """)
+        # tabel pentru hash-urile TON procesate (anti-duplicate)
+        await conn.execute("""
+            CREATE TABLE IF NOT EXISTS ton_processed (
+                tx_hash TEXT PRIMARY KEY,
+                tx_id   INTEGER DEFAULT NULL,
+                processed_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            )
+        """)
         # defaults
         defaults = [
             ('withdrawal_days',        '[-1]'),
@@ -186,6 +194,23 @@ async def get_stats():
             "pending_withdrawals":  pending_withdrawals,
             "volume_today":         float(volume_today),
         }
+
+# ─── SETTINGS ─────────────────────────────────────────
+# ─── TON HASH TRACKING ────────────────────────────────
+async def get_transaction_by_ton_hash(tx_hash: str):
+    pool = await get_pool()
+    async with pool.acquire() as conn:
+        return await conn.fetchrow(
+            "SELECT * FROM ton_processed WHERE tx_hash=$1", tx_hash
+        )
+
+async def save_ton_hash(tx_hash: str, tx_id):
+    pool = await get_pool()
+    async with pool.acquire() as conn:
+        await conn.execute(
+            "INSERT INTO ton_processed (tx_hash, tx_id) VALUES ($1, $2) ON CONFLICT (tx_hash) DO NOTHING",
+            tx_hash, tx_id
+        )
 
 # ─── SETTINGS ─────────────────────────────────────────
 async def get_setting(key: str) -> str:
