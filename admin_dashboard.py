@@ -38,7 +38,7 @@ def login():
                 request.form["password"] == ADMIN_PASSWORD):
             session["logged_in"] = True
             return redirect(url_for("dashboard"))
-        error = "Credențiale greșite."
+        error = "Invalid credentials."
     return render_template_string(LOGIN_HTML, error=error)
 
 @app.route("/logout")
@@ -352,9 +352,9 @@ LOGIN_HTML = """<!DOCTYPE html>
   <form method="POST">
     <label>Username</label>
     <input type="text" name="username" autocomplete="username" required>
-    <label>Parolă</label>
+    <label>Password</label>
     <input type="password" name="password" autocomplete="current-password" required>
-    <button type="submit">Intră în panou</button>
+    <button type="submit">Sign In</button>
   </form>
 </div>
 </body>
@@ -820,18 +820,18 @@ DASHBOARD_HTML = """<!DOCTYPE html>
       <span class="badge" id="pending-badge" style="display:none">0</span>
     </div>
     <div class="nav-item" onclick="showPage('users')">
-      <span class="nav-icon">👥</span> Utilizatori
+      <span class="nav-icon">👥</span> Users
     </div>
     <div class="nav-item" onclick="showPage('transactions')">
-      <span class="nav-icon">💳</span> Tranzacții
+      <span class="nav-icon">💳</span> Transactions
     </div>
     <div class="nav-item" onclick="showPage('settings')">
-      <span class="nav-icon">⚙️</span> Setări
+      <span class="nav-icon">⚙️</span> Settings
     </div>
   </nav>
   <div class="sidebar-footer">
     <a href="/logout" class="logout-btn">
-      <span>🚪</span> Ieșire
+      <span>🚪</span> Logout
     </a>
   </div>
 </div>
@@ -843,32 +843,32 @@ DASHBOARD_HTML = """<!DOCTYPE html>
   <div class="page active" id="page-overview">
     <div class="page-header">
       <h2>Overview</h2>
-      <p>Situația generală a clubului</p>
+      <p>General club overview</p>
     </div>
     <div class="stats-grid" id="stats-grid">
       <div class="stat-card">
         <div class="stat-icon">👥</div>
-        <div class="stat-label">Total Utilizatori</div>
+        <div class="stat-label">Total Users</div>
         <div class="stat-value" id="stat-users">—</div>
       </div>
       <div class="stat-card">
         <div class="stat-icon">💰</div>
-        <div class="stat-label">Sold Total Cumulat</div>
+        <div class="stat-label">Total Balance</div>
         <div class="stat-value gold" id="stat-balance">—</div>
       </div>
       <div class="stat-card">
         <div class="stat-icon">📈</div>
-        <div class="stat-label">Volum Azi</div>
+        <div class="stat-label">Volume Today</div>
         <div class="stat-value green" id="stat-volume">—</div>
       </div>
       <div class="stat-card">
         <div class="stat-icon">⏳</div>
-        <div class="stat-label">Depuneri Pending</div>
+        <div class="stat-label">Pending Deposits</div>
         <div class="stat-value" id="stat-pdep" style="color:var(--gold)">—</div>
       </div>
       <div class="stat-card">
         <div class="stat-icon">🔄</div>
-        <div class="stat-label">Retrageri Pending</div>
+        <div class="stat-label">Pending Withdrawals</div>
         <div class="stat-value red" id="stat-pwit">—</div>
       </div>
     </div>
@@ -878,8 +878,8 @@ DASHBOARD_HTML = """<!DOCTYPE html>
   <div class="page" id="page-pending">
     <div class="page-header" style="display:flex;align-items:center;justify-content:space-between">
       <div>
-        <h2>Tranzacții Pending</h2>
-        <p>Depuneri și retrageri care necesită acțiune</p>
+        <h2>Pending Transactions</h2>
+        <p>Deposits and withdrawals requiring action</p>
       </div>
       <button class="refresh-btn" onclick="loadPending()">↻ Refresh</button>
     </div>
@@ -887,19 +887,19 @@ DASHBOARD_HTML = """<!DOCTYPE html>
       <div>
         <div class="table-card">
           <div class="table-header">
-            <h3>💰 Depuneri în așteptare</h3>
+            <h3>💰 Pending Deposits</h3>
           </div>
           <table>
             <thead>
               <tr>
                 <th>GG User</th>
-                <th>Sumă</th>
-                <th>Data</th>
-                <th>Acțiuni</th>
+                <th>Amount</th>
+                <th>Date</th>
+                <th>Actions</th>
               </tr>
             </thead>
             <tbody id="pending-deposits-body">
-              <tr><td colspan="4" class="empty-state"><div class="icon">⏳</div>Se încarcă...</td></tr>
+              <tr><td colspan="4" class="empty-state"><div class="icon">⏳</div>Loading...</td></tr>
             </tbody>
           </table>
         </div>
@@ -907,19 +907,19 @@ DASHBOARD_HTML = """<!DOCTYPE html>
       <div>
         <div class="table-card">
           <div class="table-header">
-            <h3>💸 Retrageri în așteptare</h3>
+            <h3>💸 Pending Withdrawals</h3>
           </div>
           <table>
             <thead>
               <tr>
                 <th>GG User</th>
-                <th>Sumă</th>
-                <th>Data</th>
-                <th>Acțiuni</th>
+                <th>Amount</th>
+                <th>Date</th>
+                <th>Actions</th>
               </tr>
             </thead>
             <tbody id="pending-withdrawals-body">
-              <tr><td colspan="4" class="empty-state"><div class="icon">⏳</div>Se încarcă...</td></tr>
+              <tr><td colspan="4" class="empty-state"><div class="icon">⏳</div>Loading...</td></tr>
             </tbody>
           </table>
         </div>
@@ -930,27 +930,27 @@ DASHBOARD_HTML = """<!DOCTYPE html>
   <!-- USERS PAGE -->
   <div class="page" id="page-users">
     <div class="page-header">
-      <h2>Utilizatori</h2>
-      <p>Toți membrii înregistrați ai clubului</p>
+      <h2>Users</h2>
+      <p>All registered club members</p>
     </div>
     <div class="table-card">
       <div class="table-header">
         <h3>Membri</h3>
-        <input class="table-search" placeholder="Caută utilizator..." oninput="filterTable('users-body', this.value)">
+        <input class="table-search" placeholder="Search user..." oninput="filterTable('users-body', this.value)">
       </div>
       <table>
         <thead>
           <tr>
             <th>Telegram ID</th>
             <th>GG Username</th>
-            <th>Sold (USDT)</th>
+            <th>Balance (USDT)</th>
             <th>Status</th>
-            <th>Înregistrat</th>
-            <th>Acțiuni</th>
+            <th>Registered</th>
+            <th>Actions</th>
           </tr>
         </thead>
         <tbody id="users-body">
-          <tr><td colspan="6" class="empty-state"><div class="icon">⏳</div>Se încarcă...</td></tr>
+          <tr><td colspan="6" class="empty-state"><div class="icon">⏳</div>Loading...</td></tr>
         </tbody>
       </table>
     </div>
@@ -959,27 +959,27 @@ DASHBOARD_HTML = """<!DOCTYPE html>
   <!-- TRANSACTIONS PAGE -->
   <div class="page" id="page-transactions">
     <div class="page-header">
-      <h2>Tranzacții</h2>
-      <p>Istoricul complet al depunerilor și retragerilor</p>
+      <h2>Transactions</h2>
+      <p>Complete history of deposits and withdrawals</p>
     </div>
     <div class="table-card">
       <div class="table-header">
-        <h3>Toate tranzacțiile</h3>
-        <input class="table-search" placeholder="Caută..." oninput="filterTable('tx-body', this.value)">
+        <h3>All transactions</h3>
+        <input class="table-search" placeholder="Search..." oninput="filterTable('tx-body', this.value)">
       </div>
       <table>
         <thead>
           <tr>
             <th>#</th>
             <th>GG User</th>
-            <th>Tip</th>
-            <th>Sumă</th>
+            <th>Type</th>
+            <th>Amount</th>
             <th>Status</th>
-            <th>Data</th>
+            <th>Date</th>
           </tr>
         </thead>
         <tbody id="tx-body">
-          <tr><td colspan="6" class="empty-state"><div class="icon">⏳</div>Se încarcă...</td></tr>
+          <tr><td colspan="6" class="empty-state"><div class="icon">⏳</div>Loading...</td></tr>
         </tbody>
       </table>
     </div>
@@ -988,102 +988,102 @@ DASHBOARD_HTML = """<!DOCTYPE html>
   <!-- SETTINGS PAGE -->
   <div class="page" id="page-settings">
     <div class="page-header">
-      <h2>Setări</h2>
-      <p>Configurează regulile clubului</p>
+      <h2>Settings</h2>
+      <p>Configure club rules</p>
     </div>
 
     <!-- ZILE RETRAGERI -->
     <div class="table-card" style="padding:28px; margin-bottom:20px;">
-      <h3 style="font-size:15px; margin-bottom:6px;">💸 Zile permise pentru retrageri</h3>
+      <h3 style="font-size:15px; margin-bottom:6px;">💸 Allowed withdrawal days</h3>
       <p style="color:var(--text-dim); font-size:13px; margin-bottom:24px;">
-        Userii pot cere retrageri <strong>doar</strong> în zilele bifate. Dacă nicio zi nu e selectată, retragerile sunt blocate.
+        Users can only request withdrawals on the selected days. If no day is selected, withdrawals are blocked.
       </p>
       <div class="days-grid" id="withdraw-days-grid">
         <div class="day-card always-card" data-day="-1" onclick="toggleAlways(this,'withdraw')">
           <span class="day-icon">🟢</span>
-          <span class="day-name">Întotdeauna</span>
+          <span class="day-name">Always</span>
           <span style="font-size:10px;color:var(--text-dim);display:block;margin-top:4px;">Always open</span>
         </div>
         <div class="day-card" data-day="0" onclick="toggleDay(this,'withdraw')"><span class="day-icon">📅</span><span class="day-name">Luni</span></div>
-        <div class="day-card" data-day="1" onclick="toggleDay(this,'withdraw')"><span class="day-icon">📅</span><span class="day-name">Marți</span></div>
+        <div class="day-card" data-day="1" onclick="toggleDay(this,'withdraw')"><span class="day-icon">📅</span><span class="day-name">Tuesday</span></div>
         <div class="day-card" data-day="2" onclick="toggleDay(this,'withdraw')"><span class="day-icon">📅</span><span class="day-name">Miercuri</span></div>
         <div class="day-card" data-day="3" onclick="toggleDay(this,'withdraw')"><span class="day-icon">📅</span><span class="day-name">Joi</span></div>
         <div class="day-card" data-day="4" onclick="toggleDay(this,'withdraw')"><span class="day-icon">📅</span><span class="day-name">Vineri</span></div>
-        <div class="day-card" data-day="5" onclick="toggleDay(this,'withdraw')"><span class="day-icon">📅</span><span class="day-name">Sâmbătă</span></div>
-        <div class="day-card" data-day="6" onclick="toggleDay(this,'withdraw')"><span class="day-icon">📅</span><span class="day-name">Duminică</span></div>
+        <div class="day-card" data-day="5" onclick="toggleDay(this,'withdraw')"><span class="day-icon">📅</span><span class="day-name">Saturday</span></div>
+        <div class="day-card" data-day="6" onclick="toggleDay(this,'withdraw')"><span class="day-icon">📅</span><span class="day-name">Sunday</span></div>
       </div>
       <div style="display:flex; align-items:center; gap:16px; margin-top:20px;">
-        <button class="btn btn-gold" onclick="saveDays('withdraw')" style="padding:12px 28px; font-size:13px;">💾 Salvează</button>
+        <button class="btn btn-gold" onclick="saveDays('withdraw')" style="padding:12px 28px; font-size:13px;">💾 Save</button>
         <span id="withdraw-days-status" style="font-size:13px; color:var(--text-dim);"></span>
       </div>
     </div>
 
-    <!-- BLOCARE URGENTĂ RETRAGERI -->
+    <!-- EMERGENCY WITHDRAWAL BLOCK -->
     <div class="table-card" style="padding:28px; margin-bottom:20px;">
-      <h3 style="font-size:15px; margin-bottom:6px;">🔴 Dezactivare urgentă retrageri</h3>
+      <h3 style="font-size:15px; margin-bottom:6px;">🔴 Emergency withdrawal block</h3>
       <p style="color:var(--text-dim); font-size:13px; margin-bottom:24px;">
-        Blochează <strong>imediat</strong> toate retragerile indiferent de zilele setate. Util pentru mentenanță sau probleme tehnice.
+        Immediately blocks all withdrawals regardless of day settings. Useful for maintenance or technical issues.
       </p>
       <div style="display:flex; align-items:center; gap:16px; margin-bottom:20px;">
         <div class="toggle-track" id="withdraw-toggle-track" onclick="toggleBlock('withdraw')">
           <div class="toggle-thumb"></div>
         </div>
-        <span id="withdraw-block-label" style="font-size:14px; font-weight:600; color:var(--green)">🟢 Retrageri active</span>
+        <span id="withdraw-block-label" style="font-size:14px; font-weight:600; color:var(--green)">🟢 Withdrawals active</span>
       </div>
       <label style="display:block; color:var(--text-dim); font-size:11px; letter-spacing:2px; text-transform:uppercase; margin-bottom:8px;">
-        Mesaj afișat utilizatorilor
+        Message shown to users
       </label>
-      <textarea id="withdraw-block-msg" style="width:100%; background:rgba(255,255,255,0.04); border:1px solid var(--border-light); border-radius:8px; padding:12px 14px; color:var(--text); font-family:'Raleway',sans-serif; font-size:13px; outline:none; resize:vertical; min-height:80px; line-height:1.5;" placeholder="Ex: Retragerile sunt temporar dezactivate din cauze tehnice..."></textarea>
+      <textarea id="withdraw-block-msg" style="width:100%; background:rgba(255,255,255,0.04); border:1px solid var(--border-light); border-radius:8px; padding:12px 14px; color:var(--text); font-family:'Raleway',sans-serif; font-size:13px; outline:none; resize:vertical; min-height:80px; line-height:1.5;" placeholder="e.g. Withdrawals are temporarily disabled due to technical issues..."></textarea>
       <div style="margin-top:16px; display:flex; gap:12px; align-items:center;">
-        <button class="btn btn-red" onclick="saveBlock('withdraw')" style="padding:12px 28px; font-size:13px;">🔴 Aplică imediat</button>
+        <button class="btn btn-red" onclick="saveBlock('withdraw')" style="padding:12px 28px; font-size:13px;">🔴 Apply immediately</button>
         <span id="withdraw-block-status" style="font-size:13px; color:var(--text-dim);"></span>
       </div>
     </div>
 
     <!-- ZILE DEPUNERI -->
     <div class="table-card" style="padding:28px; margin-bottom:20px;">
-      <h3 style="font-size:15px; margin-bottom:6px;">💰 Zile permise pentru depuneri</h3>
+      <h3 style="font-size:15px; margin-bottom:6px;">💰 Allowed deposit days</h3>
       <p style="color:var(--text-dim); font-size:13px; margin-bottom:24px;">
-        Userii pot face depuneri <strong>doar</strong> în zilele bifate. Dacă nicio zi nu e selectată, depunerile sunt blocate.
+        Users can only make deposits on the selected days. If no day is selected, deposits are blocked.
       </p>
       <div class="days-grid" id="deposit-days-grid">
         <div class="day-card always-card" data-day="-1" onclick="toggleAlways(this,'deposit')">
           <span class="day-icon">🟢</span>
-          <span class="day-name">Întotdeauna</span>
+          <span class="day-name">Always</span>
           <span style="font-size:10px;color:var(--text-dim);display:block;margin-top:4px;">Always open</span>
         </div>
         <div class="day-card" data-day="0" onclick="toggleDay(this,'deposit')"><span class="day-icon">📅</span><span class="day-name">Luni</span></div>
-        <div class="day-card" data-day="1" onclick="toggleDay(this,'deposit')"><span class="day-icon">📅</span><span class="day-name">Marți</span></div>
+        <div class="day-card" data-day="1" onclick="toggleDay(this,'deposit')"><span class="day-icon">📅</span><span class="day-name">Tuesday</span></div>
         <div class="day-card" data-day="2" onclick="toggleDay(this,'deposit')"><span class="day-icon">📅</span><span class="day-name">Miercuri</span></div>
         <div class="day-card" data-day="3" onclick="toggleDay(this,'deposit')"><span class="day-icon">📅</span><span class="day-name">Joi</span></div>
         <div class="day-card" data-day="4" onclick="toggleDay(this,'deposit')"><span class="day-icon">📅</span><span class="day-name">Vineri</span></div>
-        <div class="day-card" data-day="5" onclick="toggleDay(this,'deposit')"><span class="day-icon">📅</span><span class="day-name">Sâmbătă</span></div>
-        <div class="day-card" data-day="6" onclick="toggleDay(this,'deposit')"><span class="day-icon">📅</span><span class="day-name">Duminică</span></div>
+        <div class="day-card" data-day="5" onclick="toggleDay(this,'deposit')"><span class="day-icon">📅</span><span class="day-name">Saturday</span></div>
+        <div class="day-card" data-day="6" onclick="toggleDay(this,'deposit')"><span class="day-icon">📅</span><span class="day-name">Sunday</span></div>
       </div>
       <div style="display:flex; align-items:center; gap:16px; margin-top:20px;">
-        <button class="btn btn-gold" onclick="saveDays('deposit')" style="padding:12px 28px; font-size:13px;">💾 Salvează</button>
+        <button class="btn btn-gold" onclick="saveDays('deposit')" style="padding:12px 28px; font-size:13px;">💾 Save</button>
         <span id="deposit-days-status" style="font-size:13px; color:var(--text-dim);"></span>
       </div>
     </div>
 
-    <!-- BLOCARE URGENTĂ DEPUNERI -->
+    <!-- EMERGENCY DEPOSIT BLOCK -->
     <div class="table-card" style="padding:28px; margin-bottom:20px;">
-      <h3 style="font-size:15px; margin-bottom:6px;">🔴 Dezactivare urgentă depuneri</h3>
+      <h3 style="font-size:15px; margin-bottom:6px;">🔴 Emergency deposit block</h3>
       <p style="color:var(--text-dim); font-size:13px; margin-bottom:24px;">
-        Blochează <strong>imediat</strong> toate depunerile indiferent de zilele setate.
+        Immediately blocks all deposits regardless of day settings.
       </p>
       <div style="display:flex; align-items:center; gap:16px; margin-bottom:20px;">
         <div class="toggle-track" id="deposit-toggle-track" onclick="toggleBlock('deposit')">
           <div class="toggle-thumb"></div>
         </div>
-        <span id="deposit-block-label" style="font-size:14px; font-weight:600; color:var(--green)">🟢 Depuneri active</span>
+        <span id="deposit-block-label" style="font-size:14px; font-weight:600; color:var(--green)">🟢 Deposits active</span>
       </div>
       <label style="display:block; color:var(--text-dim); font-size:11px; letter-spacing:2px; text-transform:uppercase; margin-bottom:8px;">
-        Mesaj afișat utilizatorilor
+        Message shown to users
       </label>
-      <textarea id="deposit-block-msg" style="width:100%; background:rgba(255,255,255,0.04); border:1px solid var(--border-light); border-radius:8px; padding:12px 14px; color:var(--text); font-family:'Raleway',sans-serif; font-size:13px; outline:none; resize:vertical; min-height:80px; line-height:1.5;" placeholder="Ex: Depunerile sunt temporar dezactivate din cauze tehnice..."></textarea>
+      <textarea id="deposit-block-msg" style="width:100%; background:rgba(255,255,255,0.04); border:1px solid var(--border-light); border-radius:8px; padding:12px 14px; color:var(--text); font-family:'Raleway',sans-serif; font-size:13px; outline:none; resize:vertical; min-height:80px; line-height:1.5;" placeholder="e.g. Deposits are temporarily disabled due to technical issues..."></textarea>
       <div style="margin-top:16px; display:flex; gap:12px; align-items:center;">
-        <button class="btn btn-red" onclick="saveBlock('deposit')" style="padding:12px 28px; font-size:13px;">🔴 Aplică imediat</button>
+        <button class="btn btn-red" onclick="saveBlock('deposit')" style="padding:12px 28px; font-size:13px;">🔴 Apply immediately</button>
         <span id="deposit-block-status" style="font-size:13px; color:var(--text-dim);"></span>
       </div>
     </div>
@@ -1095,16 +1095,16 @@ DASHBOARD_HTML = """<!DOCTYPE html>
 <!-- EDIT BALANCE MODAL -->
 <div class="modal-overlay" id="balance-modal">
   <div class="modal">
-    <h3>✏️ Editează Sold</h3>
+    <h3>✏️ Edit Balance</h3>
     <label>Telegram ID</label>
     <input type="text" id="edit-tg-id" readonly>
     <label>GG Username</label>
     <input type="text" id="edit-gg-name" readonly>
-    <label>Sold Nou (USDT)</label>
+    <label>New Balance (USDT)</label>
     <input type="number" id="edit-balance-val" step="0.01" min="0" placeholder="0.00">
     <div class="modal-actions">
-      <button class="btn btn-ghost" onclick="closeModal('balance-modal')">Anulează</button>
-      <button class="btn btn-gold" onclick="saveBalance()">Salvează</button>
+      <button class="btn btn-ghost" onclick="closeModal('balance-modal')">Cancel</button>
+      <button class="btn btn-gold" onclick="saveBalance()">Save</button>
     </div>
   </div>
 </div>
@@ -1112,17 +1112,17 @@ DASHBOARD_HTML = """<!DOCTYPE html>
 <!-- DEPOSIT AMOUNT MODAL -->
 <div class="modal-overlay" id="deposit-amount-modal">
   <div class="modal">
-    <h3>💰 Confirmă Depunere</h3>
-    <p style="color:var(--text-dim);font-size:13px;margin-bottom:16px">Introdu suma primită efectiv de la utilizator.</p>
+    <h3>💰 Confirm Deposit</h3>
+    <p style="color:var(--text-dim);font-size:13px;margin-bottom:16px">Enter the actual amount received from the user.</p>
     <label>GG Username</label>
     <input type="text" id="dep-gg-name" readonly>
-    <label>Suma Primită (USDT)</label>
+    <label>Amount Received (USDT)</label>
     <input type="number" id="dep-amount-val" step="0.01" min="0.01" placeholder="0.00">
     <input type="hidden" id="dep-tx-id">
     <input type="hidden" id="dep-user-id">
     <div class="modal-actions">
-      <button class="btn btn-ghost" onclick="closeModal('deposit-amount-modal')">Anulează</button>
-      <button class="btn btn-gold" onclick="confirmDepositAmount()">Confirmă</button>
+      <button class="btn btn-ghost" onclick="closeModal('deposit-amount-modal')">Cancel</button>
+      <button class="btn btn-gold" onclick="confirmDepositAmount()">Confirm</button>
     </div>
   </div>
 </div>
@@ -1207,7 +1207,7 @@ async function loadPending() {
 
   const depBody = document.getElementById('pending-deposits-body');
   if (deposits.length === 0) {
-    depBody.innerHTML = '<tr><td colspan="4"><div class="empty-state"><div class="icon">✅</div>Nicio depunere în așteptare</div></td></tr>';
+    depBody.innerHTML = '<tr><td colspan="4"><div class="empty-state"><div class="icon">✅</div>No pending deposits</div></td></tr>';
   } else {
     depBody.innerHTML = deposits.map(t => `
       <tr>
@@ -1215,8 +1215,8 @@ async function loadPending() {
         <td><span class="pill pill-yellow">${fNum(t.amount)} USDT</span></td>
         <td style="color:var(--text-dim);font-size:12px">${fDate(t.created_at)}</td>
         <td>
-          <button class="btn btn-green btn-sm" onclick="openDepositApprove(${t.id}, ${t.user_id}, '${t.gg_username}')">✓ Confirmă</button>
-          <button class="btn btn-red btn-sm" style="margin-top:4px" onclick="rejectTx(${t.id}, 'deposit')">✗ Respinge</button>
+          <button class="btn btn-green btn-sm" onclick="openDepositApprove(${t.id}, ${t.user_id}, '${t.gg_username}')">✓ Confirm</button>
+          <button class="btn btn-red btn-sm" style="margin-top:4px" onclick="rejectTx(${t.id}, 'deposit')">✗ Reject</button>
         </td>
       </tr>
     `).join('');
@@ -1224,7 +1224,7 @@ async function loadPending() {
 
   const witBody = document.getElementById('pending-withdrawals-body');
   if (withdrawals.length === 0) {
-    witBody.innerHTML = '<tr><td colspan="4"><div class="empty-state"><div class="icon">✅</div>Nicio retragere în așteptare</div></td></tr>';
+    witBody.innerHTML = '<tr><td colspan="4"><div class="empty-state"><div class="icon">✅</div>No pending withdrawals</div></td></tr>';
   } else {
     witBody.innerHTML = withdrawals.map(t => `
       <tr>
@@ -1232,8 +1232,8 @@ async function loadPending() {
         <td><span class="pill pill-red">${fNum(t.amount)} USDT</span></td>
         <td style="color:var(--text-dim);font-size:12px">${fDate(t.created_at)}</td>
         <td>
-          <button class="btn btn-green btn-sm" onclick="approveTx(${t.id}, ${t.user_id}, ${t.amount}, 'withdraw')">✓ Aprobă</button>
-          <button class="btn btn-red btn-sm" style="margin-top:4px" onclick="rejectTx(${t.id}, 'withdraw')">✗ Respinge</button>
+          <button class="btn btn-green btn-sm" onclick="approveTx(${t.id}, ${t.user_id}, ${t.amount}, 'withdraw')">✓ Approve</button>
+          <button class="btn btn-red btn-sm" style="margin-top:4px" onclick="rejectTx(${t.id}, 'withdraw')">✗ Reject</button>
         </td>
       </tr>
     `).join('');
@@ -1247,7 +1247,7 @@ async function loadUsers() {
   const body = document.getElementById('users-body');
 
   if (users.length === 0) {
-    body.innerHTML = '<tr><td colspan="6"><div class="empty-state"><div class="icon">👥</div>Niciun utilizator înregistrat</div></td></tr>';
+    body.innerHTML = '<tr><td colspan="6"><div class="empty-state"><div class="icon">👥</div>No registered users</div></td></tr>';
     return;
   }
 
@@ -1260,7 +1260,7 @@ async function loadUsers() {
       <td style="color:var(--text-dim);font-size:12px">${fDate(u.registered_at)}</td>
       <td>
         <button class="btn btn-ghost btn-sm" onclick="openBalanceEdit(${u.telegram_id}, '${u.gg_username}', ${u.balance})">
-          ✏️ Editează Sold
+          ✏️ Edit Balance
         </button>
       </td>
     </tr>
@@ -1274,7 +1274,7 @@ async function loadTransactions() {
   const body = document.getElementById('tx-body');
 
   if (txs.length === 0) {
-    body.innerHTML = '<tr><td colspan="6"><div class="empty-state"><div class="icon">💳</div>Nicio tranzacție</div></td></tr>';
+    body.innerHTML = '<tr><td colspan="6"><div class="empty-state"><div class="icon">💳</div>No transactions</div></td></tr>';
     return;
   }
 
@@ -1321,11 +1321,11 @@ async function saveBalance() {
 
   if ((await r.json()).success) {
     closeModal('balance-modal');
-    showToast('✅ Sold actualizat cu succes!');
+    showToast('✅ Balance updated successfully!');
     loadUsers();
     loadStats();
   } else {
-    showToast('❌ Eroare la actualizare', 'error');
+    showToast('❌ Update error', 'error');
   }
 }
 
@@ -1344,7 +1344,7 @@ async function confirmDepositAmount() {
   const amount = parseFloat(document.getElementById('dep-amount-val').value);
 
   if (!amount || amount <= 0) {
-    showToast('⚠️ Introdu o sumă validă', 'error');
+    showToast('⚠️ Please enter a valid amount', 'error');
     return;
   }
 
@@ -1356,41 +1356,41 @@ async function confirmDepositAmount() {
 
   if ((await r.json()).success) {
     closeModal('deposit-amount-modal');
-    showToast('✅ Depunere confirmată și sold actualizat!');
+    showToast('✅ Deposit confirmed and balance updated!');
     loadPending();
     loadStats();
   } else {
-    showToast('❌ Eroare', 'error');
+    showToast('❌ Error', 'error');
   }
 }
 
 async function approveTx(txId, userId, amount, type) {
-  if (!confirm(`Confirmi aprobarea de ${fNum(amount)} USDT?`)) return;
+  if (!confirm(`Confirm approval of ${fNum(amount)} USDT?`)) return;
   const r = await fetch('/api/approve_transaction', {
     method: 'POST',
     headers: {'Content-Type':'application/json'},
     body: JSON.stringify({tx_id: txId, user_id: userId, amount: amount, type: type})
   });
   if ((await r.json()).success) {
-    showToast('✅ Tranzacție aprobată!');
+    showToast('✅ Transaction approved!');
     loadPending(); loadStats();
   } else {
-    showToast('❌ Eroare', 'error');
+    showToast('❌ Error', 'error');
   }
 }
 
 async function rejectTx(txId, type) {
-  if (!confirm('Ești sigur că vrei să respingi această tranzacție?')) return;
+  if (!confirm('Are you sure you want to reject this transaction?')) return;
   const r = await fetch('/api/reject_transaction', {
     method: 'POST',
     headers: {'Content-Type':'application/json'},
     body: JSON.stringify({tx_id: txId})
   });
   if ((await r.json()).success) {
-    showToast('Tranzacție respinsă.', 'error');
+    showToast('Transaction rejected.', 'error');
     loadPending(); loadStats();
   } else {
-    showToast('❌ Eroare', 'error');
+    showToast('❌ Error', 'error');
   }
 }
 
@@ -1402,7 +1402,7 @@ document.querySelectorAll('.modal-overlay').forEach(overlay => {
 });
 
 // ── SETTINGS ───────────────────────────────
-const ZILE = ['Luni','Marți','Miercuri','Joi','Vineri','Sâmbătă','Duminică'];
+const ZILE = ['Monday','Tuesday','Wednesday','Thursday','Friday','Saturday','Sunday'];
 
 async function loadSettings() {
   await loadDays('withdraw');
@@ -1429,7 +1429,7 @@ async function loadBlock(op) {
   const track = document.getElementById(`${op}-toggle-track`);
   const label = document.getElementById(`${op}-block-label`);
   const msgEl = document.getElementById(`${op}-block-msg`);
-  const opLabel = op === 'deposit' ? 'Depuneri' : 'Retrageri';
+  const opLabel = op === 'deposit' ? 'Deposits' : 'Withdrawals';
   if (d.blocked) {
     track.classList.add('on');
     label.textContent = `🔴 ${opLabel} BLOCATE`;
@@ -1444,12 +1444,12 @@ async function loadBlock(op) {
 
 function updateDaysStatus(op, selected) {
   const status = document.getElementById(`${op}-days-status`);
-  const opLabel = op === 'deposit' ? 'depunerile' : 'retragerile';
+  const opLabel = op === 'deposit' ? 'deposits' : 'withdrawals';
   if (selected.length === 0) {
-    status.textContent = `⚠️ Nicio zi — ${opLabel} sunt blocate`;
+    status.textContent = `⚠️ No day selected — ${opLabel} are blocked`;
     status.style.color = 'var(--red)';
   } else if (selected.includes(-1)) {
-    status.textContent = `🟢 Permise oricând (Always open)`;
+    status.textContent = `🟢 Always open`;
     status.style.color = 'var(--green)';
   } else {
     const names = selected.filter(d => d >= 0).sort().map(d => ZILE[d]).join(', ');
@@ -1485,17 +1485,17 @@ async function saveDays(op) {
     body: JSON.stringify({days: selected})
   });
   if ((await r.json()).success) {
-    showToast('✅ Setări salvate!');
+    showToast('✅ Settings saved!');
     updateDaysStatus(op, selected);
   } else {
-    showToast('❌ Eroare la salvare', 'error');
+    showToast('❌ Save error', 'error');
   }
 }
 
 function toggleBlock(op) {
   const track = document.getElementById(`${op}-toggle-track`);
   const label = document.getElementById(`${op}-block-label`);
-  const opLabel = op === 'deposit' ? 'Depuneri' : 'Retrageri';
+  const opLabel = op === 'deposit' ? 'Deposits' : 'Withdrawals';
   const isOn = track.classList.contains('on');
   track.classList.toggle('on', !isOn);
   if (!isOn) {
@@ -1511,9 +1511,9 @@ async function saveBlock(op) {
   const blocked = document.getElementById(`${op}-toggle-track`).classList.contains('on');
   const msg = document.getElementById(`${op}-block-msg`).value.trim();
   const status = document.getElementById(`${op}-block-status`);
-  const opLabel = op === 'deposit' ? 'depunerile' : 'retragerile';
+  const opLabel = op === 'deposit' ? 'deposits' : 'withdrawals';
   if (blocked && !msg) {
-    showToast('⚠️ Scrie un mesaj pentru utilizatori!', 'error');
+    showToast('⚠️ Please write a message for users!', 'error');
     return;
   }
   const r = await fetch(`/api/${op}_block`, {
@@ -1523,10 +1523,10 @@ async function saveBlock(op) {
   });
   if ((await r.json()).success) {
     showToast(blocked ? `🔴 ${opLabel.charAt(0).toUpperCase()+opLabel.slice(1)} blocate!` : '✅ Reactivat!');
-    status.textContent = blocked ? 'Blocat de acum' : 'Activ de acum';
+    status.textContent = blocked ? 'Blocked from now' : 'Active from now';
     status.style.color = blocked ? 'var(--red)' : 'var(--green)';
   } else {
-    showToast('❌ Eroare', 'error');
+    showToast('❌ Error', 'error');
   }
 }
 
@@ -1545,7 +1545,7 @@ def crypto_webhook():
     import hmac
     import json
 
-    # verificare semnătură CryptoBot
+    # verify CryptoBot signature
     token = os.getenv("CRYPTO_BOT_TOKEN", "")
     secret = hashlib.sha256(token.encode()).digest()
 
@@ -1582,13 +1582,13 @@ def crypto_webhook():
                     f"https://api.telegram.org/bot{bot_token}/sendMessage",
                     json={
                         "chat_id": telegram_id,
-                        "text": f"✅ Depunerea ta de *{amount:.2f} USDT* a fost confirmată automat!\nFondurile sunt acum disponibile în contul tău. 🎰",
+                        "text": f"✅ Your deposit of *{amount:.2f} USDT* has been confirmed automatically!\nFunds are now available in your account. 🎰",
                         "parse_mode": "Markdown"
                     }
                 )
         run_async(notify_user())
 
-        print(f"✅ Plată confirmată: {amount} USDT pentru user {telegram_id}")
+        print(f"✅ Payment confirmed: {amount} USDT for user {telegram_id}")
 
     except Exception as e:
         print(f"Webhook error: {e}")
