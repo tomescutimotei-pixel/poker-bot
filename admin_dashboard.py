@@ -154,6 +154,81 @@ def api_reject_transaction():
     run_async(database.update_transaction_status(tx_id, "rejected"))
     return jsonify({"success": True})
 
+@app.route("/api/withdrawal_days", methods=["GET"])
+@login_required
+def api_get_withdrawal_days():
+    import json as json_lib
+    raw = run_async(database.get_setting("withdrawal_days"))
+    days = json_lib.loads(raw) if raw else []
+    return jsonify({"days": days})
+
+@app.route("/api/withdrawal_days", methods=["POST"])
+@login_required
+def api_set_withdrawal_days():
+    import json as json_lib
+    data = request.json
+    days = data.get("days", [])
+    run_async(database.set_setting("withdrawal_days", json_lib.dumps(days)))
+    return jsonify({"success": True})
+
+@app.route("/api/withdrawal_block", methods=["GET"])
+@login_required
+def api_get_withdrawal_block():
+    blocked = run_async(database.get_setting("withdrawal_blocked"))
+    msg = run_async(database.get_setting("withdrawal_blocked_msg"))
+    return jsonify({
+        "blocked": blocked == "true",
+        "message": msg or ""
+    })
+
+@app.route("/api/withdrawal_block", methods=["POST"])
+@login_required
+def api_set_withdrawal_block():
+    data = request.json
+    blocked = "true" if data.get("blocked") else "false"
+    msg = data.get("message", "")
+    run_async(database.set_setting("withdrawal_blocked", blocked))
+    run_async(database.set_setting("withdrawal_blocked_msg", msg))
+    return jsonify({"success": True})
+
+# ─── DEPOSIT SETTINGS ─────────────────────────────────
+@app.route("/api/deposit_days", methods=["GET"])
+@login_required
+def api_get_deposit_days():
+    import json as json_lib
+    raw = run_async(database.get_setting("deposit_days"))
+    days = json_lib.loads(raw) if raw else []
+    return jsonify({"days": days})
+
+@app.route("/api/deposit_days", methods=["POST"])
+@login_required
+def api_set_deposit_days():
+    import json as json_lib
+    data = request.json
+    days = data.get("days", [])
+    run_async(database.set_setting("deposit_days", json_lib.dumps(days)))
+    return jsonify({"success": True})
+
+@app.route("/api/deposit_block", methods=["GET"])
+@login_required
+def api_get_deposit_block():
+    blocked = run_async(database.get_setting("deposit_blocked"))
+    msg = run_async(database.get_setting("deposit_blocked_msg"))
+    return jsonify({
+        "blocked": blocked == "true",
+        "message": msg or ""
+    })
+
+@app.route("/api/deposit_block", methods=["POST"])
+@login_required
+def api_set_deposit_block():
+    data = request.json
+    blocked = "true" if data.get("blocked") else "false"
+    msg = data.get("message", "")
+    run_async(database.set_setting("deposit_blocked", blocked))
+    run_async(database.set_setting("deposit_blocked_msg", msg))
+    return jsonify({"success": True})
+
 # ─── HTML TEMPLATES ───────────────────────────────────
 LOGIN_HTML = """<!DOCTYPE html>
 <html lang="ro">
@@ -656,6 +731,76 @@ DASHBOARD_HTML = """<!DOCTYPE html>
     height: 14px;
   }
   @keyframes shimmer { to { background-position: -200% 0; } }
+
+  /* ── DAY CARDS ── */
+  .day-card {
+    background: var(--card2);
+    border: 2px solid var(--border-light);
+    border-radius: 12px;
+    padding: 18px 14px;
+    text-align: center;
+    cursor: pointer;
+    transition: all 0.2s;
+    user-select: none;
+  }
+  .day-card:hover {
+    border-color: rgba(201,168,76,0.4);
+    background: rgba(201,168,76,0.05);
+  }
+  .day-card.selected {
+    border-color: var(--gold);
+    background: var(--gold-dim);
+  }
+  .day-card.selected .day-icon { filter: none; }
+  .day-icon {
+    display: block;
+    font-size: 24px;
+    margin-bottom: 8px;
+    filter: grayscale(1) opacity(0.4);
+    transition: filter 0.2s;
+  }
+  .day-card.selected .day-icon { filter: none; }
+  .day-name {
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--text-dim);
+    transition: color 0.2s;
+  }
+  .day-card.selected .day-name { color: var(--gold); }
+  .day-card.always-card.selected {
+    border-color: var(--green);
+    background: rgba(76,175,130,0.1);
+  }
+  .day-card.always-card.selected .day-name { color: var(--green); }
+
+  /* ── DAYS GRID ── */
+  .days-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+    gap: 12px;
+  }
+
+  /* ── TOGGLE ── */
+  .toggle-track {
+    width: 48px; height: 26px;
+    background: rgba(255,255,255,0.1);
+    border-radius: 13px;
+    position: relative;
+    transition: background 0.25s;
+    cursor: pointer;
+    border: 1px solid rgba(255,255,255,0.1);
+  }
+  .toggle-track.on { background: var(--red); border-color: var(--red); }
+  .toggle-thumb {
+    position: absolute;
+    top: 3px; left: 3px;
+    width: 18px; height: 18px;
+    background: #fff;
+    border-radius: 50%;
+    transition: transform 0.25s;
+    box-shadow: 0 1px 4px rgba(0,0,0,0.3);
+  }
+  .toggle-track.on .toggle-thumb { transform: translateX(22px); }
 </style>
 </head>
 <body>
@@ -679,6 +824,9 @@ DASHBOARD_HTML = """<!DOCTYPE html>
     </div>
     <div class="nav-item" onclick="showPage('transactions')">
       <span class="nav-icon">💳</span> Tranzacții
+    </div>
+    <div class="nav-item" onclick="showPage('settings')">
+      <span class="nav-icon">⚙️</span> Setări
     </div>
   </nav>
   <div class="sidebar-footer">
@@ -837,6 +985,111 @@ DASHBOARD_HTML = """<!DOCTYPE html>
     </div>
   </div>
 
+  <!-- SETTINGS PAGE -->
+  <div class="page" id="page-settings">
+    <div class="page-header">
+      <h2>Setări</h2>
+      <p>Configurează regulile clubului</p>
+    </div>
+
+    <!-- ZILE RETRAGERI -->
+    <div class="table-card" style="padding:28px; margin-bottom:20px;">
+      <h3 style="font-size:15px; margin-bottom:6px;">💸 Zile permise pentru retrageri</h3>
+      <p style="color:var(--text-dim); font-size:13px; margin-bottom:24px;">
+        Userii pot cere retrageri <strong>doar</strong> în zilele bifate. Dacă nicio zi nu e selectată, retragerile sunt blocate.
+      </p>
+      <div class="days-grid" id="withdraw-days-grid">
+        <div class="day-card always-card" data-day="-1" onclick="toggleAlways(this,'withdraw')">
+          <span class="day-icon">🟢</span>
+          <span class="day-name">Întotdeauna</span>
+          <span style="font-size:10px;color:var(--text-dim);display:block;margin-top:4px;">Always open</span>
+        </div>
+        <div class="day-card" data-day="0" onclick="toggleDay(this,'withdraw')"><span class="day-icon">📅</span><span class="day-name">Luni</span></div>
+        <div class="day-card" data-day="1" onclick="toggleDay(this,'withdraw')"><span class="day-icon">📅</span><span class="day-name">Marți</span></div>
+        <div class="day-card" data-day="2" onclick="toggleDay(this,'withdraw')"><span class="day-icon">📅</span><span class="day-name">Miercuri</span></div>
+        <div class="day-card" data-day="3" onclick="toggleDay(this,'withdraw')"><span class="day-icon">📅</span><span class="day-name">Joi</span></div>
+        <div class="day-card" data-day="4" onclick="toggleDay(this,'withdraw')"><span class="day-icon">📅</span><span class="day-name">Vineri</span></div>
+        <div class="day-card" data-day="5" onclick="toggleDay(this,'withdraw')"><span class="day-icon">📅</span><span class="day-name">Sâmbătă</span></div>
+        <div class="day-card" data-day="6" onclick="toggleDay(this,'withdraw')"><span class="day-icon">📅</span><span class="day-name">Duminică</span></div>
+      </div>
+      <div style="display:flex; align-items:center; gap:16px; margin-top:20px;">
+        <button class="btn btn-gold" onclick="saveDays('withdraw')" style="padding:12px 28px; font-size:13px;">💾 Salvează</button>
+        <span id="withdraw-days-status" style="font-size:13px; color:var(--text-dim);"></span>
+      </div>
+    </div>
+
+    <!-- BLOCARE URGENTĂ RETRAGERI -->
+    <div class="table-card" style="padding:28px; margin-bottom:20px;">
+      <h3 style="font-size:15px; margin-bottom:6px;">🔴 Dezactivare urgentă retrageri</h3>
+      <p style="color:var(--text-dim); font-size:13px; margin-bottom:24px;">
+        Blochează <strong>imediat</strong> toate retragerile indiferent de zilele setate. Util pentru mentenanță sau probleme tehnice.
+      </p>
+      <div style="display:flex; align-items:center; gap:16px; margin-bottom:20px;">
+        <div class="toggle-track" id="withdraw-toggle-track" onclick="toggleBlock('withdraw')">
+          <div class="toggle-thumb"></div>
+        </div>
+        <span id="withdraw-block-label" style="font-size:14px; font-weight:600; color:var(--green)">🟢 Retrageri active</span>
+      </div>
+      <label style="display:block; color:var(--text-dim); font-size:11px; letter-spacing:2px; text-transform:uppercase; margin-bottom:8px;">
+        Mesaj afișat utilizatorilor
+      </label>
+      <textarea id="withdraw-block-msg" style="width:100%; background:rgba(255,255,255,0.04); border:1px solid var(--border-light); border-radius:8px; padding:12px 14px; color:var(--text); font-family:'Raleway',sans-serif; font-size:13px; outline:none; resize:vertical; min-height:80px; line-height:1.5;" placeholder="Ex: Retragerile sunt temporar dezactivate din cauze tehnice..."></textarea>
+      <div style="margin-top:16px; display:flex; gap:12px; align-items:center;">
+        <button class="btn btn-red" onclick="saveBlock('withdraw')" style="padding:12px 28px; font-size:13px;">🔴 Aplică imediat</button>
+        <span id="withdraw-block-status" style="font-size:13px; color:var(--text-dim);"></span>
+      </div>
+    </div>
+
+    <!-- ZILE DEPUNERI -->
+    <div class="table-card" style="padding:28px; margin-bottom:20px;">
+      <h3 style="font-size:15px; margin-bottom:6px;">💰 Zile permise pentru depuneri</h3>
+      <p style="color:var(--text-dim); font-size:13px; margin-bottom:24px;">
+        Userii pot face depuneri <strong>doar</strong> în zilele bifate. Dacă nicio zi nu e selectată, depunerile sunt blocate.
+      </p>
+      <div class="days-grid" id="deposit-days-grid">
+        <div class="day-card always-card" data-day="-1" onclick="toggleAlways(this,'deposit')">
+          <span class="day-icon">🟢</span>
+          <span class="day-name">Întotdeauna</span>
+          <span style="font-size:10px;color:var(--text-dim);display:block;margin-top:4px;">Always open</span>
+        </div>
+        <div class="day-card" data-day="0" onclick="toggleDay(this,'deposit')"><span class="day-icon">📅</span><span class="day-name">Luni</span></div>
+        <div class="day-card" data-day="1" onclick="toggleDay(this,'deposit')"><span class="day-icon">📅</span><span class="day-name">Marți</span></div>
+        <div class="day-card" data-day="2" onclick="toggleDay(this,'deposit')"><span class="day-icon">📅</span><span class="day-name">Miercuri</span></div>
+        <div class="day-card" data-day="3" onclick="toggleDay(this,'deposit')"><span class="day-icon">📅</span><span class="day-name">Joi</span></div>
+        <div class="day-card" data-day="4" onclick="toggleDay(this,'deposit')"><span class="day-icon">📅</span><span class="day-name">Vineri</span></div>
+        <div class="day-card" data-day="5" onclick="toggleDay(this,'deposit')"><span class="day-icon">📅</span><span class="day-name">Sâmbătă</span></div>
+        <div class="day-card" data-day="6" onclick="toggleDay(this,'deposit')"><span class="day-icon">📅</span><span class="day-name">Duminică</span></div>
+      </div>
+      <div style="display:flex; align-items:center; gap:16px; margin-top:20px;">
+        <button class="btn btn-gold" onclick="saveDays('deposit')" style="padding:12px 28px; font-size:13px;">💾 Salvează</button>
+        <span id="deposit-days-status" style="font-size:13px; color:var(--text-dim);"></span>
+      </div>
+    </div>
+
+    <!-- BLOCARE URGENTĂ DEPUNERI -->
+    <div class="table-card" style="padding:28px; margin-bottom:20px;">
+      <h3 style="font-size:15px; margin-bottom:6px;">🔴 Dezactivare urgentă depuneri</h3>
+      <p style="color:var(--text-dim); font-size:13px; margin-bottom:24px;">
+        Blochează <strong>imediat</strong> toate depunerile indiferent de zilele setate.
+      </p>
+      <div style="display:flex; align-items:center; gap:16px; margin-bottom:20px;">
+        <div class="toggle-track" id="deposit-toggle-track" onclick="toggleBlock('deposit')">
+          <div class="toggle-thumb"></div>
+        </div>
+        <span id="deposit-block-label" style="font-size:14px; font-weight:600; color:var(--green)">🟢 Depuneri active</span>
+      </div>
+      <label style="display:block; color:var(--text-dim); font-size:11px; letter-spacing:2px; text-transform:uppercase; margin-bottom:8px;">
+        Mesaj afișat utilizatorilor
+      </label>
+      <textarea id="deposit-block-msg" style="width:100%; background:rgba(255,255,255,0.04); border:1px solid var(--border-light); border-radius:8px; padding:12px 14px; color:var(--text); font-family:'Raleway',sans-serif; font-size:13px; outline:none; resize:vertical; min-height:80px; line-height:1.5;" placeholder="Ex: Depunerile sunt temporar dezactivate din cauze tehnice..."></textarea>
+      <div style="margin-top:16px; display:flex; gap:12px; align-items:center;">
+        <button class="btn btn-red" onclick="saveBlock('deposit')" style="padding:12px 28px; font-size:13px;">🔴 Aplică imediat</button>
+        <span id="deposit-block-status" style="font-size:13px; color:var(--text-dim);"></span>
+      </div>
+    </div>
+
+  </div>
+
 </main>
 
 <!-- EDIT BALANCE MODAL -->
@@ -879,15 +1132,13 @@ DASHBOARD_HTML = """<!DOCTYPE html>
 
 <script>
 // ── NAVIGATION ─────────────────────────────
-const pages = ['overview','pending','users','transactions'];
+const pages = ['overview','pending','users','transactions','settings'];
 
 function showPage(name) {
   pages.forEach(p => {
     document.getElementById('page-'+p).classList.remove('active');
-    document.querySelectorAll('.nav-item').forEach((el, i) => {
-      if (el.onclick && el.onclick.toString().includes(pages[i])) el.classList.remove('active');
-    });
   });
+  document.querySelectorAll('.nav-item').forEach(el => el.classList.remove('active'));
   document.getElementById('page-'+name).classList.add('active');
   document.querySelectorAll('.nav-item').forEach(el => {
     if (el.onclick && el.onclick.toString().includes("'"+name+"'")) el.classList.add('active');
@@ -897,6 +1148,7 @@ function showPage(name) {
   if (name === 'pending') loadPending();
   if (name === 'users') loadUsers();
   if (name === 'transactions') loadTransactions();
+  if (name === 'settings') loadSettings();
 }
 
 // ── TOAST ──────────────────────────────────
@@ -1149,12 +1401,201 @@ document.querySelectorAll('.modal-overlay').forEach(overlay => {
   });
 });
 
+// ── SETTINGS ───────────────────────────────
+const ZILE = ['Luni','Marți','Miercuri','Joi','Vineri','Sâmbătă','Duminică'];
+
+async function loadSettings() {
+  await loadDays('withdraw');
+  await loadDays('deposit');
+  await loadBlock('withdraw');
+  await loadBlock('deposit');
+}
+
+async function loadDays(op) {
+  const r = await fetch(`/api/${op}_days`);
+  const d = await r.json();
+  const selected = d.days || [];
+  const grid = document.getElementById(`${op}-days-grid`);
+  grid.querySelectorAll('.day-card').forEach(card => {
+    const day = parseInt(card.dataset.day);
+    card.classList.toggle('selected', selected.includes(day));
+  });
+  updateDaysStatus(op, selected);
+}
+
+async function loadBlock(op) {
+  const r = await fetch(`/api/${op}_block`);
+  const d = await r.json();
+  const track = document.getElementById(`${op}-toggle-track`);
+  const label = document.getElementById(`${op}-block-label`);
+  const msgEl = document.getElementById(`${op}-block-msg`);
+  const opLabel = op === 'deposit' ? 'Depuneri' : 'Retrageri';
+  if (d.blocked) {
+    track.classList.add('on');
+    label.textContent = `🔴 ${opLabel} BLOCATE`;
+    label.style.color = 'var(--red)';
+  } else {
+    track.classList.remove('on');
+    label.textContent = `🟢 ${opLabel} active`;
+    label.style.color = 'var(--green)';
+  }
+  msgEl.value = d.message || '';
+}
+
+function updateDaysStatus(op, selected) {
+  const status = document.getElementById(`${op}-days-status`);
+  const opLabel = op === 'deposit' ? 'depunerile' : 'retragerile';
+  if (selected.length === 0) {
+    status.textContent = `⚠️ Nicio zi — ${opLabel} sunt blocate`;
+    status.style.color = 'var(--red)';
+  } else if (selected.includes(-1)) {
+    status.textContent = `🟢 Permise oricând (Always open)`;
+    status.style.color = 'var(--green)';
+  } else {
+    const names = selected.filter(d => d >= 0).sort().map(d => ZILE[d]).join(', ');
+    status.textContent = `✅ Activ: ${names} (UTC)`;
+    status.style.color = 'var(--green)';
+  }
+}
+
+function toggleAlways(card, op) {
+  const grid = document.getElementById(`${op}-days-grid`);
+  const isSelected = card.classList.contains('selected');
+  grid.querySelectorAll('.day-card').forEach(c => c.classList.remove('selected'));
+  if (!isSelected) card.classList.add('selected');
+  const selected = [...grid.querySelectorAll('.day-card.selected')].map(c => parseInt(c.dataset.day));
+  updateDaysStatus(op, selected);
+}
+
+function toggleDay(card, op) {
+  const grid = document.getElementById(`${op}-days-grid`);
+  const alwaysCard = grid.querySelector('.always-card');
+  if (alwaysCard) alwaysCard.classList.remove('selected');
+  card.classList.toggle('selected');
+  const selected = [...grid.querySelectorAll('.day-card.selected')].map(c => parseInt(c.dataset.day));
+  updateDaysStatus(op, selected);
+}
+
+async function saveDays(op) {
+  const grid = document.getElementById(`${op}-days-grid`);
+  const selected = [...grid.querySelectorAll('.day-card.selected')].map(c => parseInt(c.dataset.day));
+  const r = await fetch(`/api/${op}_days`, {
+    method: 'POST',
+    headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify({days: selected})
+  });
+  if ((await r.json()).success) {
+    showToast('✅ Setări salvate!');
+    updateDaysStatus(op, selected);
+  } else {
+    showToast('❌ Eroare la salvare', 'error');
+  }
+}
+
+function toggleBlock(op) {
+  const track = document.getElementById(`${op}-toggle-track`);
+  const label = document.getElementById(`${op}-block-label`);
+  const opLabel = op === 'deposit' ? 'Depuneri' : 'Retrageri';
+  const isOn = track.classList.contains('on');
+  track.classList.toggle('on', !isOn);
+  if (!isOn) {
+    label.textContent = `🔴 ${opLabel} BLOCATE`;
+    label.style.color = 'var(--red)';
+  } else {
+    label.textContent = `🟢 ${opLabel} active`;
+    label.style.color = 'var(--green)';
+  }
+}
+
+async function saveBlock(op) {
+  const blocked = document.getElementById(`${op}-toggle-track`).classList.contains('on');
+  const msg = document.getElementById(`${op}-block-msg`).value.trim();
+  const status = document.getElementById(`${op}-block-status`);
+  const opLabel = op === 'deposit' ? 'depunerile' : 'retragerile';
+  if (blocked && !msg) {
+    showToast('⚠️ Scrie un mesaj pentru utilizatori!', 'error');
+    return;
+  }
+  const r = await fetch(`/api/${op}_block`, {
+    method: 'POST',
+    headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify({blocked, message: msg})
+  });
+  if ((await r.json()).success) {
+    showToast(blocked ? `🔴 ${opLabel.charAt(0).toUpperCase()+opLabel.slice(1)} blocate!` : '✅ Reactivat!');
+    status.textContent = blocked ? 'Blocat de acum' : 'Activ de acum';
+    status.style.color = blocked ? 'var(--red)' : 'var(--green)';
+  } else {
+    showToast('❌ Eroare', 'error');
+  }
+}
+
 // ── INIT ───────────────────────────────────
 loadStats();
 setInterval(loadStats, 30000); // refresh stats every 30s
 </script>
 </body>
 </html>"""
+
+
+# ─── CRYPTOBOT WEBHOOK ────────────────────────────────
+@app.route("/webhook/crypto", methods=["POST"])
+def crypto_webhook():
+    import hashlib
+    import hmac
+    import json
+
+    # verificare semnătură CryptoBot
+    token = os.getenv("CRYPTO_BOT_TOKEN", "")
+    secret = hashlib.sha256(token.encode()).digest()
+
+    received_sig = request.headers.get("crypto-pay-api-signature", "")
+    body = request.get_data(as_text=True)
+    expected_sig = hmac.new(secret, body.encode(), hashlib.sha256).hexdigest()
+
+    if not hmac.compare_digest(received_sig, expected_sig):
+        return jsonify({"error": "Invalid signature"}), 403
+
+    data = request.json
+    if not data or data.get("update_type") != "invoice_paid":
+        return jsonify({"ok": True})
+
+    payload_data = data.get("payload", {})
+    invoice_id = str(payload_data.get("invoice_id", ""))
+    amount = float(payload_data.get("amount", 0))
+    custom_payload = payload_data.get("payload", "")
+
+    try:
+        parts = custom_payload.split(":")
+        telegram_id = int(parts[0])
+        tx_id = int(parts[1])
+
+        run_async(database.update_balance(telegram_id, amount))
+        run_async(database.update_transaction_status(tx_id, "completed"))
+
+        # notificare user prin Bot B
+        import aiohttp as aiohttp_lib
+        async def notify_user():
+            bot_token = os.getenv("BOT_B_TOKEN", "")
+            async with aiohttp_lib.ClientSession() as session:
+                await session.post(
+                    f"https://api.telegram.org/bot{bot_token}/sendMessage",
+                    json={
+                        "chat_id": telegram_id,
+                        "text": f"✅ Depunerea ta de *{amount:.2f} USDT* a fost confirmată automat!\nFondurile sunt acum disponibile în contul tău. 🎰",
+                        "parse_mode": "Markdown"
+                    }
+                )
+        run_async(notify_user())
+
+        print(f"✅ Plată confirmată: {amount} USDT pentru user {telegram_id}")
+
+    except Exception as e:
+        print(f"Webhook error: {e}")
+        return jsonify({"error": str(e)}), 500
+
+    return jsonify({"ok": True})
+
 
 if __name__ == "__main__":
     port = int(os.getenv("PORT", 5000))
