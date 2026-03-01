@@ -13,11 +13,11 @@ async def new_member_joined(event: types.ChatMemberUpdated):
         return
 
     welcome_text = (
-        f"🃏 Bun venit la *KingsRiver Poker Club*, {user.full_name}!\n\n"
-        f"Pentru a accesa clubul, depuneri și retrageri,\n"
-        f"te rugăm să deschizi chat-ul privat cu botul nostru:\n\n"
+        f"🃏 Welcome to *KingsRiver Poker Club*, {user.full_name}!\n\n"
+        f"To access the club, make deposits and withdrawals,\n"
+        f"please open a private chat with our bot:\n\n"
         f"👉 {config.OPERATIONS_BOT_USERNAME}\n\n"
-        f"Apasă /start acolo pentru a începe înregistrarea."
+        f"Press /start there to begin registration."
     )
 
     await bot.send_message(
@@ -27,7 +27,7 @@ async def new_member_joined(event: types.ChatMemberUpdated):
     )
 
 async def main():
-    print("Bot A (Canal Monitor) pornit...")
+    print("Bot A (Channel Monitor) started...")
     await dp.start_polling(
         bot,
         allowed_updates=["chat_member", "message", "callback_query"]

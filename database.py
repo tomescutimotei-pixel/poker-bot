@@ -44,7 +44,7 @@ async def init_db():
                 value TEXT
             )
         """)
-        # tabel pentru hash-urile TON procesate (anti-duplicate)
+        # table for processed TON hashes (anti-duplicate)
         await conn.execute("""
             CREATE TABLE IF NOT EXISTS ton_processed (
                 tx_hash TEXT PRIMARY KEY,
@@ -56,10 +56,10 @@ async def init_db():
         defaults = [
             ('withdrawal_days',        '[-1]'),
             ('withdrawal_blocked',     'false'),
-            ('withdrawal_blocked_msg', 'Retragerile sunt temporar dezactivate din cauze tehnice. Îți mulțumim pentru înțelegere!'),
+            ('withdrawal_blocked_msg', 'Withdrawals are temporarily disabled due to technical issues. Thank you for your patience!'),
             ('deposit_days',           '[-1]'),
             ('deposit_blocked',        'false'),
-            ('deposit_blocked_msg',    'Depunerile sunt temporar dezactivate din cauze tehnice. Îți mulțumim pentru înțelegere!'),
+            ('deposit_blocked_msg',    'Deposits are temporarily disabled due to technical issues. Thank you for your patience!'),
         ]
         for key, value in defaults:
             await conn.execute(
@@ -180,11 +180,11 @@ async def get_all_transactions(limit=100):
 async def get_stats():
     pool = await get_pool()
     async with pool.acquire() as conn:
-        total_users       = await conn.fetchval("SELECT COUNT(*) FROM users")
-        total_balance     = await conn.fetchval("SELECT COALESCE(SUM(balance), 0) FROM users")
-        pending_deposits  = await conn.fetchval("SELECT COUNT(*) FROM transactions WHERE type='deposit'  AND status='pending'")
+        total_users         = await conn.fetchval("SELECT COUNT(*) FROM users")
+        total_balance       = await conn.fetchval("SELECT COALESCE(SUM(balance), 0) FROM users")
+        pending_deposits    = await conn.fetchval("SELECT COUNT(*) FROM transactions WHERE type='deposit'  AND status='pending'")
         pending_withdrawals = await conn.fetchval("SELECT COUNT(*) FROM transactions WHERE type='withdraw' AND status='pending'")
-        volume_today      = await conn.fetchval(
+        volume_today        = await conn.fetchval(
             "SELECT COALESCE(SUM(amount), 0) FROM transactions WHERE status='completed' AND created_at::date = CURRENT_DATE"
         )
         return {
@@ -195,7 +195,6 @@ async def get_stats():
             "volume_today":         float(volume_today),
         }
 
-# ─── SETTINGS ─────────────────────────────────────────
 # ─── TON HASH TRACKING ────────────────────────────────
 async def get_transaction_by_ton_hash(tx_hash: str):
     pool = await get_pool()

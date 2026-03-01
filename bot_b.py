@@ -17,21 +17,21 @@ dp = Dispatcher(storage=storage)
 CLUB_WALLET = "UQB-Zisu31tvNvquF4WDyQHnNy8m4wdKyNsO4fGrIVAj5fwm"
 
 def deposit_code(telegram_id: int) -> str:
-    """Codul unic pe care userul îl pune ca memo la transfer."""
+    """Unique memo code for this user's deposits."""
     return f"KR-{telegram_id}"
 
 # ─── STATES ───────────────────────────────────────────
 class UserFunnel(StatesGroup):
-    waiting_gg_username  = State()
+    waiting_gg_username   = State()
     waiting_custom_amount = State()
 
 # ─── KEYBOARDS ────────────────────────────────────────
 def main_menu():
     kb = InlineKeyboardBuilder()
-    kb.button(text="💰 Depunere",   callback_data="deposit")
-    kb.button(text="💸 Retragere",  callback_data="withdraw")
-    kb.button(text="📊 Sold curent",callback_data="balance")
-    kb.button(text="ℹ️ Ajutor",     callback_data="help")
+    kb.button(text="💰 Deposit",  callback_data="deposit")
+    kb.button(text="💸 Withdraw", callback_data="withdraw")
+    kb.button(text="📊 Balance",  callback_data="balance")
+    kb.button(text="ℹ️ Help",     callback_data="help")
     kb.adjust(2)
     return kb.as_markup()
 
@@ -39,49 +39,42 @@ def main_menu():
 async def ensure_registered(user_id: int) -> bool:
     return await database.get_user(user_id) is not None
 
-ZILE_RO = {
-    0: "Luni", 1: "Marți", 2: "Miercuri",
-    3: "Joi",  4: "Vineri", 5: "Sâmbătă", 6: "Duminică"
+DAYS = {
+    0: "Monday", 1: "Tuesday", 2: "Wednesday",
+    3: "Thursday", 4: "Friday", 5: "Saturday", 6: "Sunday"
 }
 
 async def check_allowed(op: str) -> tuple[bool, str]:
-    """
-    Verifică dacă operațiunea 'deposit' sau 'withdraw' e permisă azi (UTC).
-    Returnează (True, "") dacă e ok, sau (False, "mesaj pentru user") dacă nu.
-    """
-    # 1. blocare urgentă
+    # 1. emergency block
     blocked = await database.get_setting(f"{op}_blocked")
     if blocked == "true":
         msg = await database.get_setting(f"{op}_blocked_msg") or ""
-        label = "Depunerile" if op == "deposit" else "Retragerile"
-        return False, f"🔴 *{label} sunt dezactivate temporar*\n\n{msg}"
+        label = "Deposits" if op == "deposit" else "Withdrawals"
+        return False, f"🔴 *{label} are temporarily disabled*\n\n{msg}"
 
-    # 2. zile permise
+    # 2. allowed days
     raw = await database.get_setting(f"{op}_days")
     allowed_days = json.loads(raw) if raw else []
 
-    if -1 in allowed_days:          # always open
+    if -1 in allowed_days:
         return True, ""
 
     if not allowed_days:
-        label = "Depunerile" if op == "deposit" else "Retragerile"
-        return False, f"⚠️ {label} nu sunt disponibile momentan.\nContactează suportul pentru detalii."
+        label = "Deposits" if op == "deposit" else "Withdrawals"
+        return False, f"⚠️ {label} are not available at the moment.\nPlease contact support for details."
 
-    today = datetime.utcnow().weekday()   # 0 = Luni … 6 = Duminică  (UTC)
+    today = datetime.utcnow().weekday()
     if today in allowed_days:
         return True, ""
 
-    # găsim următoarea zi permisă
-    next_day_name = min(
-        [(( d - today) % 7, ZILE_RO[d]) for d in allowed_days]
-    )[1]
-    allowed_names = ", ".join(ZILE_RO[d] for d in sorted(allowed_days))
-    label_pl = "depunerile" if op == "deposit" else "retragerile"
-    label_sg = "depunere"   if op == "deposit" else "retragere"
+    next_day_name = min([((d - today) % 7, DAYS[d]) for d in allowed_days])[1]
+    allowed_names = ", ".join(DAYS[d] for d in sorted(allowed_days))
+    label_pl = "deposits" if op == "deposit" else "withdrawals"
+    label_sg = "deposit"  if op == "deposit" else "withdrawal"
     return False, (
-        f"⏰ *Zilele permise pentru {label_pl}:* {allowed_names}\n\n"
-        f"Următoarea zi de {label_sg}: *{next_day_name}*\n"
-        f"Te rugăm să revii atunci."
+        f"⏰ *{label_pl.capitalize()} are only available on:* {allowed_names}\n\n"
+        f"Next {label_sg} day: *{next_day_name}*\n"
+        f"Please come back then."
     )
 
 # ─── /START ───────────────────────────────────────────
@@ -91,56 +84,56 @@ async def start_cmd(msg: types.Message, state: FSMContext):
     user = await database.get_user(msg.from_user.id)
     if user:
         await msg.answer(
-            f"🃏 Bun venit înapoi, *{user['gg_username']}*!\n\nCe dorești să faci?",
+            f"🃏 Welcome back, *{user['gg_username']}*!\n\nWhat would you like to do?",
             reply_markup=main_menu(), parse_mode="Markdown"
         )
     else:
         await msg.answer(
-            "🃏 Bun venit la *KingsRiver Poker Club*!\n\n"
-            "Pentru a continua, trimite-ne *username-ul sau ID-ul tău din GG Poker Club*:",
+            "🃏 Welcome to *KingsRiver Poker Club*!\n\n"
+            "To get started, please send us your *GG Poker Club username or ID*:",
             parse_mode="Markdown"
         )
         await state.set_state(UserFunnel.waiting_gg_username)
 
-# ─── ÎNREGISTRARE ─────────────────────────────────────
+# ─── REGISTRATION ─────────────────────────────────────
 @dp.message(UserFunnel.waiting_gg_username)
 async def collect_gg_username(msg: types.Message, state: FSMContext):
     gg_username = msg.text.strip()
     await database.register_user(msg.from_user.id, gg_username)
     await state.clear()
     await msg.answer(
-        f"✅ Înregistrare completă!\n\n"
+        f"✅ Registration complete!\n\n"
         f"👤 GG Username: *{gg_username}*\n"
         f"🎰 Club: *KingsRiver Poker Club*\n\n"
-        f"Ce dorești să faci?",
+        f"What would you like to do?",
         reply_markup=main_menu(), parse_mode="Markdown"
     )
     await bot.send_message(
         config.ADMIN_CHAT_ID,
-        f"🆕 Utilizator nou înregistrat!\n"
+        f"🆕 New user registered!\n"
         f"👤 GG Username: *{gg_username}*\n"
         f"🆔 Telegram ID: `{msg.from_user.id}`",
         parse_mode="Markdown"
     )
 
-# ─── SOLD ─────────────────────────────────────────────
+# ─── BALANCE ──────────────────────────────────────────
 @dp.callback_query(F.data == "balance")
 async def show_balance(call: types.CallbackQuery):
     if not await ensure_registered(call.from_user.id):
-        await call.message.answer("⚠️ Nu ești înregistrat. Trimite /start pentru a începe.")
+        await call.message.answer("⚠️ You are not registered. Send /start to begin.")
         await call.answer(); return
     balance = await database.get_balance(call.from_user.id)
     await call.message.answer(
-        f"📊 Soldul tău curent: *{balance:.2f} USDT*",
+        f"📊 Your current balance: *{balance:.2f} USDT*",
         reply_markup=main_menu(), parse_mode="Markdown"
     )
     await call.answer()
 
-# ─── DEPUNERE ─────────────────────────────────────────
+# ─── DEPOSIT ──────────────────────────────────────────
 @dp.callback_query(F.data == "deposit")
 async def deposit_flow(call: types.CallbackQuery):
     if not await ensure_registered(call.from_user.id):
-        await call.message.answer("⚠️ Nu ești înregistrat. Trimite /start pentru a începe.")
+        await call.message.answer("⚠️ You are not registered. Send /start to begin.")
         await call.answer(); return
 
     allowed, msg_text = await check_allowed("deposit")
@@ -151,19 +144,20 @@ async def deposit_flow(call: types.CallbackQuery):
     code = deposit_code(call.from_user.id)
 
     kb = InlineKeyboardBuilder()
-    kb.button(text="📋 Copiază adresa", callback_data="copy_wallet")
-    kb.button(text="✅ Am trimis",       callback_data="deposit_sent")
-    kb.button(text="❌ Anulează",        callback_data="cancel")
+    kb.button(text="📋 Copy Wallet Address", callback_data="copy_wallet")
+    kb.button(text="📋 Copy Memo Code",      callback_data=f"copy_memo_{call.from_user.id}")
+    kb.button(text="✅ I've sent it",         callback_data="deposit_sent")
+    kb.button(text="❌ Cancel",               callback_data="cancel")
     kb.adjust(1)
 
     await call.message.answer(
-        f"💰 *Depunere KingsRiver Poker Club*\n\n"
-        f"Trimite *USDT (TON)* la adresa de mai jos din [Telegram Wallet](https://t.me/wallet):\n\n"
+        f"💰 *KingsRiver Poker Club — Deposit*\n\n"
+        f"Send *USDT (TON)* to the address below using [Telegram Wallet](https://t.me/wallet):\n\n"
         f"`{CLUB_WALLET}`\n\n"
-        f"⚠️ *OBLIGATORIU* — pune acest cod în câmpul *Comentariu / Memo*:\n\n"
+        f"⚠️ *REQUIRED* — enter this code in the *Comment / Memo* field:\n\n"
         f"*`{code}`*\n\n"
-        f"_Fără cod, depunerea nu poate fi procesată automat._\n\n"
-        f"Depunerea va fi confirmată automat în câteva minute după trimitere.",
+        f"_Without the code, your deposit cannot be processed automatically._\n\n"
+        f"Your deposit will be confirmed automatically within a few minutes.",
         parse_mode="Markdown",
         reply_markup=kb.as_markup()
     )
@@ -173,10 +167,10 @@ async def deposit_flow(call: types.CallbackQuery):
 async def deposit_sent(call: types.CallbackQuery):
     code = deposit_code(call.from_user.id)
     await call.message.answer(
-        f"⏳ *Așteptăm confirmarea tranzacției...*\n\n"
-        f"Sistemul verifică automat la fiecare 15 secunde.\n"
-        f"Vei primi o notificare imediat ce fondurile sunt detectate.\n\n"
-        f"Dacă ai uitat codul *`{code}`* în câmpul Comentariu, contactează suportul.",
+        f"⏳ *Waiting for transaction confirmation...*\n\n"
+        f"The system checks automatically every 15 seconds.\n"
+        f"You will be notified as soon as your funds are detected.\n\n"
+        f"If you forgot to add the code *`{code}`* in the Comment field, please contact support.",
         parse_mode="Markdown",
         reply_markup=main_menu()
     )
@@ -184,13 +178,19 @@ async def deposit_sent(call: types.CallbackQuery):
 
 @dp.callback_query(F.data == "copy_wallet")
 async def copy_wallet(call: types.CallbackQuery):
-    await call.answer(f"Adresă copiată!", show_alert=False)
+    await call.answer("Wallet address copied!", show_alert=False)
 
-# ─── RETRAGERE ────────────────────────────────────────
+@dp.callback_query(F.data.startswith("copy_memo_"))
+async def copy_memo(call: types.CallbackQuery):
+    telegram_id = int(call.data.split("_")[2])
+    code = deposit_code(telegram_id)
+    await call.answer(f"Memo Code copied: {code}", show_alert=True)
+
+# ─── WITHDRAW ─────────────────────────────────────────
 @dp.callback_query(F.data == "withdraw")
 async def withdraw_flow(call: types.CallbackQuery, state: FSMContext):
     if not await ensure_registered(call.from_user.id):
-        await call.message.answer("⚠️ Nu ești înregistrat. Trimite /start pentru a începe.")
+        await call.message.answer("⚠️ You are not registered. Send /start to begin.")
         await call.answer(); return
 
     allowed, msg_text = await check_allowed("withdraw")
@@ -200,34 +200,34 @@ async def withdraw_flow(call: types.CallbackQuery, state: FSMContext):
 
     balance = await database.get_balance(call.from_user.id)
     await call.message.answer(
-        f"💸 *Retragere KingsRiver Poker Club*\n\n"
-        f"Soldul tău curent: *{balance:.2f} USDT*\n\n"
-        f"Introdu suma pe care dorești să o retragi:",
+        f"💸 *KingsRiver Poker Club — Withdrawal*\n\n"
+        f"Your current balance: *{balance:.2f} USDT*\n\n"
+        f"Enter the amount you wish to withdraw:",
         parse_mode="Markdown"
     )
     await state.set_state(UserFunnel.waiting_custom_amount)
     await state.update_data(mode="withdraw")
     await call.answer()
 
-# ─── INPUT SUMĂ CUSTOM (doar retragere) ──────────────
+# ─── CUSTOM AMOUNT INPUT ──────────────────────────────
 @dp.message(UserFunnel.waiting_custom_amount)
 async def process_custom_amount(msg: types.Message, state: FSMContext):
     try:
         amount = float(msg.text.strip().replace(",", "."))
         if amount <= 0:
-            await msg.answer("⚠️ Suma trebuie să fie mai mare decât 0.")
+            await msg.answer("⚠️ Amount must be greater than 0.")
             return
         await state.clear()
         await process_withdrawal(msg, amount)
     except ValueError:
-        await msg.answer("⚠️ Te rugăm să introduci o sumă validă (ex: 50 sau 50.5)")
+        await msg.answer("⚠️ Please enter a valid amount (e.g. 50 or 50.5)")
 
-# ─── PROCESARE RETRAGERE ──────────────────────────────
+# ─── PROCESS WITHDRAWAL ───────────────────────────────
 async def process_withdrawal(msg, amount: float):
     balance = await database.get_balance(msg.from_user.id)
     if amount > balance:
         await msg.answer(
-            f"⚠️ Sold insuficient!\nSoldul tău curent: *{balance:.2f} USDT*",
+            f"⚠️ Insufficient balance!\nYour current balance: *{balance:.2f} USDT*",
             parse_mode="Markdown"
         )
         return
@@ -237,25 +237,25 @@ async def process_withdrawal(msg, amount: float):
     tx_id   = await database.create_transaction(msg.from_user.id, "withdraw", amount)
 
     kb = InlineKeyboardBuilder()
-    kb.button(text="✅ Aprobă",  callback_data=f"approve_withdraw_{msg.from_user.id}_{amount}_{tx_id}")
-    kb.button(text="❌ Respinge",callback_data=f"reject_withdraw_{msg.from_user.id}_{tx_id}")
+    kb.button(text="✅ Approve", callback_data=f"approve_withdraw_{msg.from_user.id}_{amount}_{tx_id}")
+    kb.button(text="❌ Reject",  callback_data=f"reject_withdraw_{msg.from_user.id}_{tx_id}")
 
     await bot.send_message(
         config.ADMIN_CHAT_ID,
-        f"💸 *Cerere retragere nouă!*\n\n"
+        f"💸 *New withdrawal request!*\n\n"
         f"👤 GG Username: *{gg_name}*\n"
         f"🆔 Telegram ID: `{msg.from_user.id}`\n"
-        f"💰 Sumă: *{amount:.2f} USDT*\n"
+        f"💰 Amount: *{amount:.2f} USDT*\n"
         f"🔖 TX ID: `{tx_id}`",
         reply_markup=kb.as_markup(), parse_mode="Markdown"
     )
     await msg.answer(
-        f"✅ Cererea de retragere de *{amount:.2f} USDT* a fost trimisă.\n"
-        f"Vei fi notificat după aprobare.",
+        f"✅ Your withdrawal request of *{amount:.2f} USDT* has been submitted.\n"
+        f"You will be notified once it is approved.",
         reply_markup=main_menu(), parse_mode="Markdown"
     )
 
-# ─── ADMIN: APROBARE / RESPINGERE RETRAGERE ───────────
+# ─── ADMIN: APPROVE / REJECT ──────────────────────────
 @dp.callback_query(F.data.startswith("approve_withdraw_"))
 async def approve_withdraw(call: types.CallbackQuery):
     parts   = call.data.split("_")
@@ -264,14 +264,14 @@ async def approve_withdraw(call: types.CallbackQuery):
     tx_id   = int(parts[4])
     await database.update_balance(user_id, -amount)
     await database.update_transaction_status(tx_id, "completed")
-    await call.message.edit_text(call.message.text + "\n\n✅ *APROBAT de admin*", parse_mode="Markdown")
+    await call.message.edit_text(call.message.text + "\n\n✅ *APPROVED by admin*", parse_mode="Markdown")
     await bot.send_message(
         user_id,
-        f"✅ Retragerea ta de *{amount:.2f} USDT* a fost aprobată!\n"
-        f"Fondurile au fost trimise la wallet-ul tău.",
+        f"✅ Your withdrawal of *{amount:.2f} USDT* has been approved!\n"
+        f"Funds have been sent to your wallet.",
         parse_mode="Markdown"
     )
-    await call.answer("Retragere aprobată!")
+    await call.answer("Withdrawal approved!")
 
 @dp.callback_query(F.data.startswith("reject_withdraw_"))
 async def reject_withdraw(call: types.CallbackQuery):
@@ -279,34 +279,37 @@ async def reject_withdraw(call: types.CallbackQuery):
     user_id = int(parts[2])
     tx_id   = int(parts[3])
     await database.update_transaction_status(tx_id, "rejected")
-    await call.message.edit_text(call.message.text + "\n\n❌ *RESPINS de admin*", parse_mode="Markdown")
-    await bot.send_message(user_id, "❌ Cererea ta de retragere a fost respinsă.\nContactează suportul pentru detalii.")
-    await call.answer("Retragere respinsă!")
+    await call.message.edit_text(call.message.text + "\n\n❌ *REJECTED by admin*", parse_mode="Markdown")
+    await bot.send_message(
+        user_id,
+        "❌ Your withdrawal request has been rejected.\nPlease contact support for details."
+    )
+    await call.answer("Withdrawal rejected!")
 
-# ─── ANULARE ──────────────────────────────────────────
+# ─── CANCEL ───────────────────────────────────────────
 @dp.callback_query(F.data == "cancel")
 async def cancel_action(call: types.CallbackQuery, state: FSMContext):
     await state.clear()
-    await call.message.answer("❌ Acțiune anulată.", reply_markup=main_menu())
+    await call.message.answer("❌ Action cancelled.", reply_markup=main_menu())
     await call.answer()
 
-# ─── AJUTOR ───────────────────────────────────────────
+# ─── HELP ─────────────────────────────────────────────
 @dp.callback_query(F.data == "help")
 async def help_section(call: types.CallbackQuery):
     await call.message.answer(
-        "ℹ️ *KingsRiver Poker Club — Ajutor*\n\n"
-        "• 💰 Depunere: Trimite USDT din Telegram Wallet cu codul tău unic\n"
-        "• 💸 Retragere: Solicită retragere fonduri\n"
-        "• 📊 Sold: Vezi soldul curent\n\n"
+        "ℹ️ *KingsRiver Poker Club — Help*\n\n"
+        "• 💰 Deposit: Send USDT from Telegram Wallet using your unique Memo Code\n"
+        "• 💸 Withdraw: Request a withdrawal\n"
+        "• 📊 Balance: Check your current balance\n\n"
         "📞 Support: @KingsRiverSupport",
         reply_markup=main_menu(), parse_mode="Markdown"
     )
     await call.answer()
 
-# ─── PORNIRE ──────────────────────────────────────────
+# ─── START BOT ────────────────────────────────────────
 async def main():
     await database.init_db()
-    print("Bot B (Operațional) pornit...")
+    print("Bot B (Operations) started...")
     await dp.start_polling(bot)
 
 if __name__ == "__main__":
