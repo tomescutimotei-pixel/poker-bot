@@ -20,7 +20,7 @@ import config
 CLUB_WALLET      = "UQB-Zisu31tvNvquF4WDyQHnNy8m4wdKyNsO4fGrIVAj5fwm"
 USDT_MASTER      = "EQCxE6mUtQJKFnGfaROTKOt1lZbDiiX1kCixRv7Nw2Id_sDs"  # USDT Jetton master pe mainnet
 TONCENTER_API    = "https://toncenter.com/api/v2"
-CHECK_INTERVAL   = 15   # secunde între verificări
+CHECK_INTERVAL   = 5   # secunde între verificări
 BOT_API          = f"https://api.telegram.org/bot{config.BOT_B_TOKEN}"
 
 # ─── HELPER: COD UNIC USER ────────────────────────────
@@ -181,3 +181,4 @@ async def main():
 
 if __name__ == "__main__":
     asyncio.run(main())
+
