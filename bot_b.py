@@ -1,4 +1,5 @@
 import asyncio
+import aiohttp
 import json
 from datetime import datetime
 from aiogram import Bot, Dispatcher, types, F
@@ -14,11 +15,7 @@ bot = Bot(token=config.BOT_B_TOKEN)
 storage = MemoryStorage()
 dp = Dispatcher(storage=storage)
 
-CLUB_WALLET = "UQB-Zisu31tvNvquF4WDyQHnNy8m4wdKyNsO4fGrIVAj5fwm"
-
-def deposit_code(telegram_id: int) -> str:
-    """Unique memo code for this user's deposits."""
-    return f"KR-{telegram_id}"
+CRYPTO_BOT_API = "https://pay.crypt.bot/api"
 
 # ─── STATES ───────────────────────────────────────────
 class UserFunnel(StatesGroup):
@@ -77,6 +74,28 @@ async def check_allowed(op: str) -> tuple[bool, str]:
         f"Please come back then."
     )
 
+# ─── CRYPTOBOT: CREATE INVOICE ────────────────────────
+async def create_invoice(amount: float, telegram_id: int, tx_id: int) -> dict:
+    async with aiohttp.ClientSession() as session:
+        headers = {"Crypto-Pay-API-Token": config.CRYPTO_BOT_TOKEN}
+        payload = {
+            "asset":           "USDT",
+            "amount":          str(amount),
+            "description":     "KingsRiver Poker Club — Deposit",
+            "payload":         f"{telegram_id}:{tx_id}",
+            "allow_comments":  False,
+            "allow_anonymous": False,
+            "expires_in":      3600,
+        }
+        async with session.post(
+            f"{CRYPTO_BOT_API}/createInvoice",
+            json=payload, headers=headers
+        ) as resp:
+            data = await resp.json()
+            if data.get("ok"):
+                return data["result"]
+            raise Exception(f"CryptoBot error: {data}")
+
 # ─── /START ───────────────────────────────────────────
 @dp.message(Command("start"))
 async def start_cmd(msg: types.Message, state: FSMContext):
@@ -131,7 +150,7 @@ async def show_balance(call: types.CallbackQuery):
 
 # ─── DEPOSIT ──────────────────────────────────────────
 @dp.callback_query(F.data == "deposit")
-async def deposit_flow(call: types.CallbackQuery):
+async def deposit_flow(call: types.CallbackQuery, state: FSMContext):
     if not await ensure_registered(call.from_user.id):
         await call.message.answer("⚠️ You are not registered. Send /start to begin.")
         await call.answer(); return
@@ -141,50 +160,84 @@ async def deposit_flow(call: types.CallbackQuery):
         await call.message.answer(msg_text, parse_mode="Markdown", reply_markup=main_menu())
         await call.answer(); return
 
-    code = deposit_code(call.from_user.id)
-
     kb = InlineKeyboardBuilder()
-    kb.button(text="📋 Copy Wallet Address", callback_data="copy_wallet")
-    kb.button(text="📋 Copy Memo Code",      callback_data=f"copy_memo_{call.from_user.id}")
-    kb.button(text="✅ I've sent it",         callback_data="deposit_sent")
-    kb.button(text="❌ Cancel",               callback_data="cancel")
-    kb.adjust(1)
+    for amt in [5, 10, 25, 50, 100]:
+        kb.button(text=f"{amt} USDT", callback_data=f"dep_{amt}")
+    kb.button(text="✏️ Custom amount", callback_data="dep_custom")
+    kb.button(text="❌ Cancel",        callback_data="cancel")
+    kb.adjust(3, 3, 1)
 
     await call.message.answer(
-        f"💰 *KingsRiver Poker Club — Deposit*\n\n"
-        f"Send *USDT (TON)* to the address below using [Telegram Wallet](https://t.me/wallet):\n\n"
-        f"`{CLUB_WALLET}`\n\n"
-        f"⚠️ *REQUIRED* — enter this code in the *Comment / Memo* field:\n\n"
-        f"*`{code}`*\n\n"
-        f"_Without the code, your deposit cannot be processed automatically._\n\n"
-        f"Your deposit will be confirmed automatically within a few minutes.",
-        parse_mode="Markdown",
-        reply_markup=kb.as_markup()
+        "💰 *KingsRiver Poker Club — Deposit*\n\n"
+        "Select the amount you wish to deposit:\n"
+        "_(Payment is processed automatically via CryptoBot — USDT)_",
+        reply_markup=kb.as_markup(), parse_mode="Markdown"
     )
     await call.answer()
 
-@dp.callback_query(F.data == "deposit_sent")
-async def deposit_sent(call: types.CallbackQuery):
-    code = deposit_code(call.from_user.id)
-    await call.message.answer(
-        f"⏳ *Waiting for transaction confirmation...*\n\n"
-        f"The system checks automatically every 15 seconds.\n"
-        f"You will be notified as soon as your funds are detected.\n\n"
-        f"If you forgot to add the code *`{code}`* in the Comment field, please contact support.",
-        parse_mode="Markdown",
-        reply_markup=main_menu()
-    )
+@dp.callback_query(F.data.startswith("dep_"))
+async def handle_deposit_amount(call: types.CallbackQuery, state: FSMContext):
+    value = call.data[4:]
+    if value == "custom":
+        await call.message.answer("✏️ Enter the amount in USDT (e.g. 30 or 75.5):")
+        await state.set_state(UserFunnel.waiting_custom_amount)
+        await state.update_data(mode="deposit")
+        await call.answer(); return
     await call.answer()
+    await generate_invoice(call.message, call.from_user.id, float(value))
 
-@dp.callback_query(F.data == "copy_wallet")
-async def copy_wallet(call: types.CallbackQuery):
-    await call.answer("Wallet address copied!", show_alert=False)
+# ─── CUSTOM AMOUNT INPUT ──────────────────────────────
+@dp.message(UserFunnel.waiting_custom_amount)
+async def process_custom_amount(msg: types.Message, state: FSMContext):
+    data = await state.get_data()
+    mode = data.get("mode", "deposit")
+    try:
+        amount = float(msg.text.strip().replace(",", "."))
+        if amount <= 0:
+            await msg.answer("⚠️ Amount must be greater than 0.")
+            return
+        await state.clear()
+        if mode == "deposit":
+            await generate_invoice(msg, msg.from_user.id, amount)
+        else:
+            await process_withdrawal(msg, amount)
+    except ValueError:
+        await msg.answer("⚠️ Please enter a valid amount (e.g. 50 or 50.5)")
 
-@dp.callback_query(F.data.startswith("copy_memo_"))
-async def copy_memo(call: types.CallbackQuery):
-    telegram_id = int(call.data.split("_")[2])
-    code = deposit_code(telegram_id)
-    await call.answer(f"Memo Code copied: {code}", show_alert=True)
+# ─── GENERATE CRYPTOBOT INVOICE ───────────────────────
+async def generate_invoice(msg, telegram_id: int, amount: float):
+    try:
+        tx_id   = await database.create_transaction(telegram_id, "deposit", amount, "pending")
+        invoice = await create_invoice(amount, telegram_id, tx_id)
+        pay_url    = invoice["pay_url"]
+        invoice_id = invoice["invoice_id"]
+        await database.update_transaction_invoice(tx_id, str(invoice_id))
+
+        kb = InlineKeyboardBuilder()
+        kb.button(text=f"💳 Pay {amount:.2f} USDT", url=pay_url)
+        kb.button(text="❌ Cancel", callback_data="cancel")
+        kb.adjust(1)
+
+        await msg.answer(
+            f"💰 *Invoice generated!*\n\n"
+            f"Amount: *{amount:.2f} USDT*\n"
+            f"Valid for: *1 hour*\n\n"
+            f"Press the button below to pay via CryptoBot.\n"
+            f"✅ Your balance will be updated *automatically* after confirmation!",
+            reply_markup=kb.as_markup(), parse_mode="Markdown"
+        )
+        await bot.send_message(
+            config.ADMIN_CHAT_ID,
+            f"💰 *Deposit invoice created*\n"
+            f"🆔 Telegram ID: `{telegram_id}`\n"
+            f"💵 Amount: *{amount:.2f} USDT*\n"
+            f"🔖 TX ID: `{tx_id}` | Invoice: `{invoice_id}`\n"
+            f"_Balance updates automatically on payment._",
+            parse_mode="Markdown"
+        )
+    except Exception as e:
+        await msg.answer("⚠️ Error generating invoice. Please try again or contact support.")
+        print(f"CryptoBot invoice error: {e}")
 
 # ─── WITHDRAW ─────────────────────────────────────────
 @dp.callback_query(F.data == "withdraw")
@@ -208,19 +261,6 @@ async def withdraw_flow(call: types.CallbackQuery, state: FSMContext):
     await state.set_state(UserFunnel.waiting_custom_amount)
     await state.update_data(mode="withdraw")
     await call.answer()
-
-# ─── CUSTOM AMOUNT INPUT ──────────────────────────────
-@dp.message(UserFunnel.waiting_custom_amount)
-async def process_custom_amount(msg: types.Message, state: FSMContext):
-    try:
-        amount = float(msg.text.strip().replace(",", "."))
-        if amount <= 0:
-            await msg.answer("⚠️ Amount must be greater than 0.")
-            return
-        await state.clear()
-        await process_withdrawal(msg, amount)
-    except ValueError:
-        await msg.answer("⚠️ Please enter a valid amount (e.g. 50 or 50.5)")
 
 # ─── PROCESS WITHDRAWAL ───────────────────────────────
 async def process_withdrawal(msg, amount: float):
@@ -298,7 +338,7 @@ async def cancel_action(call: types.CallbackQuery, state: FSMContext):
 async def help_section(call: types.CallbackQuery):
     await call.message.answer(
         "ℹ️ *KingsRiver Poker Club — Help*\n\n"
-        "• 💰 Deposit: Send USDT from Telegram Wallet using your unique Memo Code\n"
+        "• 💰 Deposit: Automatic payment via CryptoBot (USDT)\n"
         "• 💸 Withdraw: Request a withdrawal\n"
         "• 📊 Balance: Check your current balance\n\n"
         "📞 Support: @KingsRiverSupport",
